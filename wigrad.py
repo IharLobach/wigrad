@@ -108,7 +108,7 @@ class WigglerRadiationSimulator():
         bessel_part_y = aux_factor*np.absolute(2*self.gamma*y_2D*sum1)**2
         dw_arr = self.lambda1_um/self.lambda_range-harmonic
         L = [(sinc(self.wiggler.N_periods*(harmonic*r2_2D+dw*A)
-              / self.wiggler.aux_const))** 2 / l * st for dw, l, st in
+              / self.wiggler.aux_const))**2 / l * st for dw, l, st in
              zip(dw_arr, self.lambda_range, self.spectral_transmission)]
         L = np.asarray(L)
         if self.only_calc_sum_of_both_polarizations:
@@ -151,13 +151,23 @@ class WigglerRadiationSimulator():
                              self.photon_flux_3D_polarization_y,
                              0)
 
-    @property
-    def photon_flux_3D_sum_both_polarizations(self):
+    def __get_photon_flux_3D_sum_both_polarizations(self):
         if self.only_calc_sum_of_both_polarizations:
             return self.__photon_flux_3D_sum_both_polarizations
         else:
             return self.photon_flux_3D_polarization_x \
                 + self.photon_flux_3D_polarization_y
+
+    def get_photon_flux_3D(self,
+                           polarization='sum'):
+        if polarization == 'sum':
+            return self.__get_photon_flux_3D_sum_both_polarizations()
+        elif polarization == 'x':
+            return self.photon_flux_3D_polarization_x
+        elif polarization == 'y':
+            return self.photon_flux_3D_polarization_y
+        else:
+            raise UnknownPolarizationTypeError()
 
     def __extend_angular_mesh_using_symmetries(self):
         x_range1 = self.x_range
@@ -189,7 +199,7 @@ class WigglerRadiationSimulator():
         if self.only_calc_sum_of_both_polarizations:
             self.__photon_flux_3D_sum_both_polarizations = \
                 self.__extend_photon_flux_using_symmetries(
-                    self.photon_flux_3D_sum_both_polarizations)
+                    self.__get_photon_flux_3D_sum_both_polarizations())
         else:
             self.photon_flux_3D_polarization_x = \
                 self.__extend_photon_flux_using_symmetries(
@@ -223,35 +233,11 @@ class WigglerRadiationSimulator():
         return ax
 
     @property
-    def angular_distribution_sum_both_polatizations(self):
-        return self.lambda_step *\
-            np.apply_over_axes(
-                np.sum,
-                self.photon_flux_3D_sum_both_polarizations,
-                [0])[0]
-
-    @property
-    def angular_distribution_x_polatization(self):
-        return self.lambda_step *\
-            np.apply_over_axes(
-                np.sum,
-                self.photon_flux_3D_polarization_x,
-                [0])[0]
-
-    @property
-    def angular_distribution_y_polatization(self):
-        return self.lambda_step *\
-            np.apply_over_axes(
-                np.sum,
-                self.photon_flux_3D_polarization_y,
-                [0])[0]
-
-    @property
     def spectral_distribution_sum_both_polatizations(self):
         return self.x_step*self.y_step \
             * np.apply_over_axes(
                 np.sum,
-                self.photon_flux_3D_sum_both_polarizations, 
+                self.__get_photon_flux_3D_sum_both_polarizations(), 
                 [1, 2]).reshape(-1)
 
     @property
@@ -266,23 +252,43 @@ class WigglerRadiationSimulator():
     def spectral_distribution_y_polatization(self):
         return self.x_step*self.y_step \
             * np.apply_over_axes(
-                np.sum,
-                self.photon_flux_3D_polarization_y, 
-                [1, 2]).reshape(-1)
+                                 np.sum,
+                                 self.photon_flux_3D_polarization_y, 
+                                 [1, 2]).reshape(-1)
+
+    def get_angular_distribution(self,
+                                 polarization='sum',
+                                 index_of_lambda=None):
+        if index_of_lambda is not None:
+            z = self.get_photon_flux_3D(polarization)[index_of_lambda]
+        else:
+            z = self.lambda_step *\
+                np.apply_over_axes(
+                    np.sum,
+                    self.get_photon_flux_3D(polarization),
+                    [0])[0]
+        return z
+
+    def get_spectral_distribution(self,
+                                  polarization='sum',
+                                  angular_indexes_tuple=None):
+        if angular_indexes_tuple is not None:
+            i, j = angular_indexes_tuple
+            z = self.get_photon_flux_3D(polarization)[:, j, i]
+        else:
+            z = self.x_step*self.y_step \
+                * np.apply_over_axes(
+                    np.sum,
+                    self.get_photon_flux_3D(polarization),
+                    [1, 2]).reshape(-1)
+        return z
 
     def show_angular_distribution(self,
                                   polarization='sum',
                                   index_of_lambda=None):
+        z = self.get_angular_distribution(polarization, index_of_lambda)
+        ax = self.__show_angular_distribution(z)
         if index_of_lambda is not None:
-            if polarization == 'sum':
-                z = self.photon_flux_3D_sum_both_polarizations
-            elif polarization == 'x':
-                z = self.photon_flux_3D_polarization_x
-            elif polarization == 'y':
-                z = self.photon_flux_3D_polarization_y
-            else:
-                raise UnknownPolarizationTypeError()
-            ax = self.__show_angular_distribution(z[index_of_lambda])
             dim = r" $\frac{\mathrm{Ph}}{\mathrm{rad}^2\mathrm{um}}$"
             ax.set_zlabel("\n"+r"$\frac{dN}{d\theta_x d\theta_y d\lambda}$,"
                           + dim,
@@ -294,15 +300,6 @@ class WigglerRadiationSimulator():
                          + "{:.3f} um".format(lambda_val))
             plt.show()
         else:
-            if polarization == 'sum':
-                z = self.angular_distribution_sum_both_polatizations
-            elif polarization == 'x':
-                z = self.angular_distribution_x_polatization
-            elif polarization == 'y':
-                z = self.angular_distribution_y_polatization
-            else:
-                raise UnknownPolarizationTypeError()
-            ax = self.__show_angular_distribution(z)
             dim = r" $\frac{\mathrm{Ph}}{\mathrm{rad}^2}$"
             ax.set_zlabel("\n"+r"$\frac{dN}{d\theta_x d\theta_y}$,"+dim,
                           fontsize=self.label_font_size,
@@ -314,17 +311,10 @@ class WigglerRadiationSimulator():
     def show_spectral_distribution(self,
                                    polarization='sum',
                                    angular_indexes_tuple=None):
+        z = self.get_spectral_distribution(polarization, angular_indexes_tuple)
+        ax = self.__show_spectral_distribution(z)
         if angular_indexes_tuple is not None:
-            if polarization == 'sum':
-                z = self.photon_flux_3D_sum_both_polarizations
-            elif polarization == 'x':
-                z = self.photon_flux_3D_polarization_x
-            elif polarization == 'y':
-                z = self.photon_flux_3D_polarization_y
-            else:
-                raise UnknownPolarizationTypeError()
             i, j = angular_indexes_tuple
-            ax = self.__show_spectral_distribution(z[:, j, i])
             dim = r" $\frac{\mathrm{Ph}}{\mathrm{rad}^2\mathrm{um}}$"
             ax.set_ylabel(r"$\frac{dN}{d\theta_x d\theta_y d\lambda}$,"
                           + dim,
@@ -340,15 +330,6 @@ class WigglerRadiationSimulator():
                          )
             plt.show()
         else:
-            if polarization == 'sum':
-                z = self.spectral_distribution_sum_both_polatizations
-            elif polarization == 'x':
-                z = self.spectral_distribution_x_polatization
-            elif polarization == 'y':
-                z = self.spectral_distribution_y_polatization
-            else:
-                raise UnknownPolarizationTypeError()
-            ax = self.__show_spectral_distribution(z)
             dim = r" $\frac{\mathrm{Ph}}{\mathrm{um}}$"
             ax.set_ylabel(r"$\frac{dN}{d\lambda}$,"+dim,
                           fontsize=self.label_font_size,
@@ -358,13 +339,5 @@ class WigglerRadiationSimulator():
             plt.show()
 
     def get_total_photon_flux(self, polarization='sum'):
-        if polarization == 'sum':
-            z = self.spectral_distribution_sum_both_polatizations
-        elif polarization == 'x':
-            z = self.spectral_distribution_x_polatization
-        elif polarization == 'y':
-            z = self.spectral_distribution_y_polatization
-        else:
-            raise UnknownPolarizationTypeError()
+        z = self.get_spectral_distribution(polarization)
         return self.lambda_step*sum(z)
-
