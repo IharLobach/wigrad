@@ -4,7 +4,7 @@ setup(
   packages = ['wigrad'],   # Chose the same as "name"
   version = '1.1',      # Start with a small number and increase it with every change you make
   license='MIT',        # Chose a license from here: https://help.github.com/articles/licensing-a-repository
-  description = 'TYPE YOUR DESCRIPTION HERE',   # Give a short description about your library
+  description = 'Caclulates the spectral-angular distribution of the number of photons emitted by one electron in a wiggler',   # Give a short description about your library
   author = 'Ihar Lobach',                   # Type in your name
   author_email = 'ilobach@uchicago.edu',      # Type in your E-Mail
   url = 'https://github.com/IharLobach/wigrad.git',   # Provide either the link to your github or to your website
