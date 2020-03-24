@@ -1,11 +1,8 @@
 # wigrad
-Caclulates the spectral-angular distribution of the number of photons emitted by one electron in a wiggler.
 
-Simply do
+Simply do `pip install wigrad` to install this package.
 
-`pip install wigrad`
-
-to install this package.
+This package calculates the spectral-angular distribution of the number of photons emitted by one electron in a wiggler.
 
 The analytical expressions from the book "The Science and Technology of Undulators and Wigglers" by James A. Clarke are used, pp. 66-67.
 
