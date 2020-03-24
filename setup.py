@@ -8,7 +8,7 @@ setup(
   author = 'Ihar Lobach',                   # Type in your name
   author_email = 'ilobach@uchicago.edu',      # Type in your E-Mail
   url = 'https://github.com/IharLobach/wigrad.git',   # Provide either the link to your github or to your website
-  download_url = 'https://github.com/IharLobach/wigrad/archive/v1.0.tar.gz',    # I explain this later on
+  download_url = 'https://github.com/IharLobach/wigrad/archive/v1.1.tar.gz',    # I explain this later on
   keywords = ['wiggler', 'undulator', 'spectrum'],   # Keywords that define your package best
   install_requires=[            # I get to this in a second
           'numpy',
