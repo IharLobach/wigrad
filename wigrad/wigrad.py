@@ -128,8 +128,8 @@ class WigglerRadiationSimulator():
         if self.only_calc_sum_of_both_polarizations:
             self.__photon_flux_3D_sum_both_polarizations = res
         else:
-            self.photon_flux_3D_polarization_x = res[0]
-            self.photon_flux_3D_polarization_y = res[1]
+            self.__photon_flux_3D_polarization_x = res[0]
+            self.__photon_flux_3D_polarization_y = res[1]
         del res
         if self.aperture == 'ellipse':
             x_max = max(self.x_range)
@@ -142,30 +142,42 @@ class WigglerRadiationSimulator():
                              self.__photon_flux_3D_sum_both_polarizations,
                              0)
             else:
-                self.photon_flux_3D_polarization_x = \
+                self.__photon_flux_3D_polarization_x = \
                     np.where(elliptic_aperture,
-                             self.photon_flux_3D_polarization_x,
+                             self.__photon_flux_3D_polarization_x,
                              0)
-                self.photon_flux_3D_polarization_y = \
+                self.__photon_flux_3D_polarization_y = \
                     np.where(elliptic_aperture,
-                             self.photon_flux_3D_polarization_y,
+                             self.__photon_flux_3D_polarization_y,
                              0)
 
     def __get_photon_flux_3D_sum_both_polarizations(self):
         if self.only_calc_sum_of_both_polarizations:
             return self.__photon_flux_3D_sum_both_polarizations
         else:
-            return self.photon_flux_3D_polarization_x \
-                + self.photon_flux_3D_polarization_y
+            return self.__photon_flux_3D_polarization_x \
+                + self.__photon_flux_3D_polarization_y
 
     def get_photon_flux_3D(self,
                            polarization='sum'):
         if polarization == 'sum':
             return self.__get_photon_flux_3D_sum_both_polarizations()
         elif polarization == 'x':
-            return self.photon_flux_3D_polarization_x
+            return self.__photon_flux_3D_polarization_x
         elif polarization == 'y':
-            return self.photon_flux_3D_polarization_y
+            return self.__photon_flux_3D_polarization_y
+        else:
+            raise UnknownPolarizationTypeError()
+
+    def set_photon_flux_3D(self,
+                           polarization,
+                           value):
+        if polarization == 'sum':
+            self.__photon_flux_3D_sum_both_polarizations = value
+        elif polarization == 'x':
+            self.__photon_flux_3D_polarization_x = value
+        elif polarization == 'y':
+            self.__photon_flux_3D_polarization_y = value
         else:
             raise UnknownPolarizationTypeError()
 
@@ -201,12 +213,12 @@ class WigglerRadiationSimulator():
                 self.__extend_photon_flux_using_symmetries(
                     self.__get_photon_flux_3D_sum_both_polarizations())
         else:
-            self.photon_flux_3D_polarization_x = \
+            self.__photon_flux_3D_polarization_x = \
                 self.__extend_photon_flux_using_symmetries(
-                    self.photon_flux_3D_polarization_x)
-            self.photon_flux_3D_polarization_y = \
+                    self.__photon_flux_3D_polarization_x)
+            self.__photon_flux_3D_polarization_y = \
                 self.__extend_photon_flux_using_symmetries(
-                    self.photon_flux_3D_polarization_y)
+                    self.__photon_flux_3D_polarization_y)
 
     def __show_angular_distribution(self, z):
         fig = plt.figure(figsize=[12, 10])
@@ -231,30 +243,6 @@ class WigglerRadiationSimulator():
         ax.set_xlabel(r"$\lambda$, um",
                       fontsize=self.label_font_size,)
         return ax
-
-    @property
-    def spectral_distribution_sum_both_polatizations(self):
-        return self.x_step*self.y_step \
-            * np.apply_over_axes(
-                np.sum,
-                self.__get_photon_flux_3D_sum_both_polarizations(), 
-                [1, 2]).reshape(-1)
-
-    @property
-    def spectral_distribution_x_polatization(self):
-        return self.x_step*self.y_step \
-            * np.apply_over_axes(
-                np.sum,
-                self.photon_flux_3D_polarization_x, 
-                [1, 2]).reshape(-1)
-
-    @property
-    def spectral_distribution_y_polatization(self):
-        return self.x_step*self.y_step \
-            * np.apply_over_axes(
-                                 np.sum,
-                                 self.photon_flux_3D_polarization_y, 
-                                 [1, 2]).reshape(-1)
 
     def get_angular_distribution(self,
                                  polarization='sum',
