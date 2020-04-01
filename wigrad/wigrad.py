@@ -99,7 +99,7 @@ class WigglerRadiationSimulator():
             jv2pp1 = jv(harmonic+2*p+1, X)
             sum3 += jv2pp1*jvpY
             jv2pm1 = jv2pp1
-        aux_factor = self.alpha*harmonic**2*self.gamma**2\
+        aux_factor = self.alpha*harmonic*self.gamma**2\
             * self.wiggler.N_periods**2\
             / A**2
         bessel_part_x = aux_factor \
