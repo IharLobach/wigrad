@@ -107,7 +107,7 @@ class WigglerRadiationSimulator():
                           - self.wiggler.K_peak*(sum2+sum3))**2
         bessel_part_y = aux_factor*np.absolute(2*self.gamma*y_2D*sum1)**2
         dw_arr = self.lambda1_um/self.lambda_range-harmonic
-        L = [(sinc(self.wiggler.N_periods*(harmonic*r2_2D+dw*A)
+        L = [(sinc(self.wiggler.N_periods*(r2_2D+dw*A)
               / self.wiggler.aux_const))**2 / l * st for dw, l, st in
              zip(dw_arr, self.lambda_range, self.spectral_transmission)]
         L = np.asarray(L)
