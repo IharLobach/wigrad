@@ -31,7 +31,6 @@ class WigglerRadiationSimulator():
                  harmonics=[1],
                  bessel_cutoff=10,
                  aperture=None,
-                 only_calc_sum_of_both_polarizations=False,
                  spectral_transmission=None):
         self.wiggler = wiggler
         self.gamma = gamma
@@ -41,8 +40,6 @@ class WigglerRadiationSimulator():
             raise ValueError("Unknown aperture type. "
                              "Choose from None and 'ellipse'")
         self.aperture = aperture
-        self.only_calc_sum_of_both_polarizations = \
-            only_calc_sum_of_both_polarizations
         self.lambda1_um = 1e6*self.wiggler.lambda_wiggler_m\
             / 2/self.gamma**2*self.wiggler.aux_const
         self.x_range, self.y_range, self.lambda_range = mesh
@@ -80,7 +77,7 @@ class WigglerRadiationSimulator():
     def y_3D(self):
         return np.tile(self.y_2D, (self.n_lambda, 1, 1))
 
-    def __calc_photon_flux_on_meshgrid_one_harmonic(self, harmonic):
+    def __calc_amplitude_on_meshgrid_one_harmonic(self, harmonic):
         x_2D = self.x_2D
         y_2D = self.y_2D
         r2_2D = self.gamma**2*(x_2D**2+y_2D**2)
@@ -99,85 +96,77 @@ class WigglerRadiationSimulator():
             jv2pp1 = jv(harmonic+2*p+1, X)
             sum3 += jv2pp1*jvpY
             jv2pm1 = jv2pp1
-        aux_factor = self.alpha*harmonic**2*self.gamma**2\
-            * self.wiggler.N_periods**2\
-            / A**2
+        aux_factor = np.sqrt(self.alpha)*harmonic*self.gamma\
+            * self.wiggler.N_periods/ A
         bessel_part_x = aux_factor \
-            * np.absolute(2*self.gamma*x_2D*sum1
-                          - self.wiggler.K_peak*(sum2+sum3))**2
-        bessel_part_y = aux_factor*np.absolute(2*self.gamma*y_2D*sum1)**2
+            * (2*self.gamma*x_2D*sum1
+                          - self.wiggler.K_peak*(sum2+sum3))
+        bessel_part_y = aux_factor*2*self.gamma*y_2D*sum1
         dw_arr = self.lambda1_um/self.lambda_range-harmonic
         L = [(sinc(self.wiggler.N_periods*(harmonic*r2_2D+dw*A)
-              / self.wiggler.aux_const))**2 / l * st for dw, l, st in
+              / self.wiggler.aux_const)) / np.sqrt(l) * np.sqrt(st)
+              for dw, l, st in
              zip(dw_arr, self.lambda_range, self.spectral_transmission)]
         L = np.asarray(L)
-        if self.only_calc_sum_of_both_polarizations:
-            return (bessel_part_x + bessel_part_y)*L
-        else:
-            return bessel_part_x*L, bessel_part_y*L
+        return bessel_part_x*L, bessel_part_y*L
 
-    def calc_photon_flux_on_meshgrid(self):
+    def calc_amplitude_on_meshgrid(self):
         res = \
-            self.__calc_photon_flux_on_meshgrid_one_harmonic(self.harmonics[0])
+            self.__calc_amplitude_on_meshgrid_one_harmonic(self.harmonics[0])
         for h in self.harmonics[1:]:
             res = np.sum(
                 (
                     res,
-                    self.__calc_photon_flux_on_meshgrid_one_harmonic(h)
+                    self.__calc_amplitude_on_meshgrid_one_harmonic(h)
                 ), axis=0)
-        if self.only_calc_sum_of_both_polarizations:
-            self.__photon_flux_3D_sum_both_polarizations = res
-        else:
-            self.__photon_flux_3D_polarization_x = res[0]
-            self.__photon_flux_3D_polarization_y = res[1]
+        self.__amplitude_3D_polarization_x = res[0]
+        self.__amplitude_3D_polarization_y = res[1]
         del res
         if self.aperture == 'ellipse':
             x_max = max(self.x_range)
             y_max = max(self.y_range)
             elliptic_aperture = \
                 (self.x_3D**2/x_max**2+self.y_3D**2/y_max**2) < 1
-            if self.only_calc_sum_of_both_polarizations:
-                self.__photon_flux_3D_sum_both_polarizations = \
-                    np.where(elliptic_aperture,
-                             self.__photon_flux_3D_sum_both_polarizations,
-                             0)
-            else:
-                self.__photon_flux_3D_polarization_x = \
-                    np.where(elliptic_aperture,
-                             self.__photon_flux_3D_polarization_x,
-                             0)
-                self.__photon_flux_3D_polarization_y = \
-                    np.where(elliptic_aperture,
-                             self.__photon_flux_3D_polarization_y,
-                             0)
+            self.__amplitude_3D_polarization_x = \
+                np.where(elliptic_aperture,
+                            self.__amplitude_3D_polarization_x,
+                            0)
+            self.__amplitude_3D_polarization_y = \
+                np.where(elliptic_aperture,
+                            self.__amplitude_3D_polarization_y,
+                            0)
 
     def __get_photon_flux_3D_sum_both_polarizations(self):
-        if self.only_calc_sum_of_both_polarizations:
-            return self.__photon_flux_3D_sum_both_polarizations
+        return self.__amplitude_3D_polarization_x**2 \
+            + self.__amplitude_3D_polarization_y**2
+        
+    def get_amplittude_3D(self,
+                          polarization):
+        if polarization == 'x':
+            return self.__amplitude_3D_polarization_x
+        elif polarization == 'y':
+            return self.__amplitude_3D_polarization_y
         else:
-            return self.__photon_flux_3D_polarization_x \
-                + self.__photon_flux_3D_polarization_y
+            raise UnknownPolarizationTypeError()
 
     def get_photon_flux_3D(self,
                            polarization='sum'):
         if polarization == 'sum':
             return self.__get_photon_flux_3D_sum_both_polarizations()
         elif polarization == 'x':
-            return self.__photon_flux_3D_polarization_x
+            return self.__amplitude_3D_polarization_x**2
         elif polarization == 'y':
-            return self.__photon_flux_3D_polarization_y
+            return self.__amplitude_3D_polarization_y**2
         else:
             raise UnknownPolarizationTypeError()
 
-    def set_photon_flux_3D(self,
+    def set_amplitude_3D(self,
                            polarization,
                            value):
-        if polarization == 'sum':
-            self.__photon_flux_3D_sum_both_polarizations = value
-        elif polarization == 'x':
-            self.__photon_flux_3D_polarization_x = value
+        if polarization == 'x':
+            self.__amplitude_3D_polarization_x = value
         elif polarization == 'y':
-            self.__photon_flux_3D_polarization_y = value
+            self.__amplitude_3D_polarization_y = value
         else:
             raise UnknownPolarizationTypeError()
 
@@ -199,7 +188,7 @@ class WigglerRadiationSimulator():
         self.x_2D = np.vstack((x34, x21))
         self.y_2D = np.vstack((y34, y21))
 
-    def __extend_photon_flux_using_symmetries(self, z):
+    def __extend_amplitudes_using_symmetries(self, z):
         z1 = z
         z2 = np.flip(z1, axis=2)
         z21 = np.concatenate((z2, z1), axis=2)
@@ -208,17 +197,12 @@ class WigglerRadiationSimulator():
 
     def extend_results_using_symmetries(self):
         self.__extend_angular_mesh_using_symmetries()
-        if self.only_calc_sum_of_both_polarizations:
-            self.__photon_flux_3D_sum_both_polarizations = \
-                self.__extend_photon_flux_using_symmetries(
-                    self.__get_photon_flux_3D_sum_both_polarizations())
-        else:
-            self.__photon_flux_3D_polarization_x = \
-                self.__extend_photon_flux_using_symmetries(
-                    self.__photon_flux_3D_polarization_x)
-            self.__photon_flux_3D_polarization_y = \
-                self.__extend_photon_flux_using_symmetries(
-                    self.__photon_flux_3D_polarization_y)
+        self.__amplitude_3D_polarization_x = \
+            self.__extend_amplitudes_using_symmetries(
+                self.__amplitude_3D_polarization_x)
+        self.__amplitude_3D_polarization_y = \
+            self.__extend_amplitudes_using_symmetries(
+                self.__amplitude_3D_polarization_y)
 
     def __show_angular_distribution(self, z):
         fig = plt.figure(figsize=[12, 10])
